@@ -14,41 +14,6 @@ Won't catch irregular inflections like tener 'to have' inflected as tiene '(s)he
 
 # Phase I - kiminoa@gmail.com
 
-LOGLEVEL = "ERROR"
-CLUSTERED_FILE = "None"
-
-# Grab command line arguments
-OPTS, MISC = getopt.getopt(sys.argv[1:],"hf:l:",["help","file=","loglevel="])
-
-def usage():
-    print "inflection_finder.py -f <csv-file> -l <loglevel:INFO|DEBUG|etc.>"
-    print "inflection_finder.py --file=<csv_file> --loglevel=DEBUG|INFO|WARNING|ERROR|CRITICAL"
-
-for opt, arg in OPTS:
-    if opt in ("-h", "--help"):
-        usage()
-        sys.exit(0)
-    elif opt in ("-f", "--file"):
-        CLUSTERED_FILE = arg
-    elif opt in ("-l", "--loglevel"):
-        loglevel = arg
-    else:
-        print "Unrecognized option."
-        usage()
-        sys.exit(2)
-
-# Set up logging
-LOG = logging.getLogger(__name__)
-LOGLVL = getattr(logging, LOGLEVEL.upper()) # convert text log level to numeric
-LOG.setLevel(LOGLVL) # set log level
-HANDLER = logging.StreamHandler()
-LOG.addHandler(HANDLER)
-
-if CLUSTERED_FILE == "None":
-    sys.exit("File not specified.  Use -f or --file to specify; see inflection_finder.py -h.")
-
-CANDIDATE_FILE = "candidate_inflections"
-
 def add_candidate_to_file(root, inflections):
     """
     outputs to an interim file: each line is a key-value pair [ { 'root' : ['inflection', 'candidates'] } ]
@@ -77,12 +42,12 @@ def process_inflections(inflections):
     cfile = shelve.open(CANDIDATE_FILE)
     
     for x in cfile:
-        LOG.debug("process_inflections: key from shelve: %s", x)
+        LOG.debug(u"process_inflections: key from shelve: %s", x)
         # each line contains a key-value pair [ {'root': ['list', 'of', 'inflection', 'candidates'] } ]
         for inflection in cfile[x]:
             # process through the value list and build our reverse key-value dictionary
             # each inflection candidate will act as a key and the roots as its list of values
-            LOG.debug("process_inflections: inflection from shelve: %s", inflection)
+            LOG.debug(u"process_inflections: inflection from shelve: %s", inflection)
             if inflection not in inflections:
                 inflections[inflection] = [] # initiate list
             inflections[inflection].append(x) # add root to candidate inflection
@@ -155,7 +120,7 @@ def get_inflections(substring, cluster):
         if inflection == '':
             inflection = "self"
         LOG.debug("get_inflections: String %s after cutting %s: %s", i, substring, inflection)
-        inflections.append(inflection.encode('utf-8'))
+        inflections.append(u"%s" % inflection) # utf-8 friendly
     return inflections
 
 def inflection_clusters(*args):
@@ -186,8 +151,49 @@ def process_clusters(cluster_file):
         inflection_clusters(cluster_list) # discover inflection candidates for each morpheme list
         del cluster_list[:] # reinitialize for next cluster
     cfile.close()
-		
-# Let's do it.
-print "\nFiles with candidate clustered morphemes should be CSV (utf-8 is Ok)."				
-process_clusters(CLUSTERED_FILE)
-process_inflections(CANDIDATE_FILE)
+
+def usage():
+    print "inflection_finder.py -f <csv-file> -l <loglevel:INFO|DEBUG|etc.>"
+    print "inflection_finder.py --file=<csv_file> --loglevel=DEBUG|INFO|WARNING|ERROR|CRITICAL"
+
+if __name__ == "__main__":
+    """
+    process cmd line args, provide usage, and execute program
+    """
+    # Defaults
+    loglevel = "ERROR"
+    clustered_file = "None"
+    global CANDIDATE_FILE
+    CANDIDATE_FILE = "candidate_inflections"
+    
+    # Grab command line arguments
+    opts, misc = getopt.getopt(sys.argv[1:], "hf:l:", ["help","file=","loglevel="])
+       
+    for opt, arg in opts:
+        if opt in ("-h", "--help"):
+            usage()
+            sys.exit(0)
+        elif opt in ("-f", "--file"):
+            clustered_file = arg
+        elif opt in ("-l", "--loglevel"):
+            loglevel = arg
+        else:
+            print "Unrecognized option."
+            usage()
+            sys.exit(2)
+
+    if clustered_file == "None":
+        sys.exit("File not specified.  Use -f or --file to specify; see inflection_finder.py -h.")
+            
+    # Set up logging
+    global LOG
+    LOG = logging.getLogger(__name__)
+    loglvl = getattr(logging, loglevel.upper()) # convert text log level to numeric
+    LOG.setLevel(loglvl) # set log level
+    handler = logging.StreamHandler()
+    LOG.addHandler(handler)
+        
+    # Let's do it.
+    print "\nFiles with candidate clustered morphemes should be CSV (utf-8 is Ok)."				
+    process_clusters(clustered_file)
+    process_inflections(CANDIDATE_FILE)
