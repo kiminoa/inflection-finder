@@ -14,13 +14,27 @@ Won't catch irregular inflections like tener 'to have' inflected as tiene '(s)he
 
 # Phase I - kiminoa@gmail.com
 
+def is_subset(member, member_of):
+    """
+    Checks if list (member) is a subset of list (member_of)
+    """
+    LOG.debug(u"is_subset: is %s a subset of %s?", member, member_of)
+    setm = frozenset(member)
+    setmo = frozenset(member_of)
+    compare_sets = setm & setmo
+    if compare_sets == setm:
+        LOG.debug(u"is_subset: %s is a subset of %s", member, member_of)
+        return True
+    else:
+        return False
+
 def add_candidate_to_file(root, inflections):
     """
     outputs to an interim file: each line is a key-value pair [ { 'root' : ['inflection', 'candidates'] } ]
     """
     root = root.encode('utf-8')
     candidate_entry = [ {root : inflections } ]
-    LOG.debug("add_candidate_to_file: %s", candidate_entry)
+    LOG.debug(u"add_candidate_to_file: %s", candidate_entry)
 	
     cfile = shelve.open(CANDIDATE_FILE)
     cfile[root] = inflections
@@ -54,7 +68,8 @@ def process_inflections(inflections):
             
     cfile.close()
 	
-    # now for the heavy-lifting.
+    print "\n\nInterim: Inflection Candidates"
+    # remove candidates with only one instance, and report what remains
     for i in inflections.keys():
         # special case: one instance
         if len(inflections[i]) == 1:
@@ -63,8 +78,41 @@ def process_inflections(inflections):
             del inflections[i]
             continue
         print "\n%s is an inflection candidate with members: " % i,
-        for i in inflections[i]:
-            print str(i),
+        for x in inflections[i]:
+            print str(x),
+         
+    print "\n\nInflection Family Candidates\n"   
+    # group candidates into sensical inflection candidate families
+    inflection_families = {}
+    
+    for x in inflections.keys():
+        # Find all other inflection candidates for which this one's members is a subset
+        for y in inflections.keys():
+            if x == y: continue
+            if len(inflections[x]) < len (inflections[y]):
+        	    smaller = inflections[x]
+        	    larger = inflections[y]
+            else:
+                smaller = inflections[y]
+                larger = inflections[x]
+            
+            if is_subset(smaller, larger):
+                LOG.debug(u"process_inflections: candidate family found via %s", str(smaller))
+                smaller = frozenset(smaller)
+                if smaller not in inflection_families:
+                    inflection_families[smaller] = []
+                if x not in inflection_families[smaller]:
+                    inflection_families[smaller].append(x)
+                    LOG.debug(u"process_inflections: %s added to inflection family for %s", x, str(smaller))
+                if y not in inflection_families[smaller]:
+                    inflection_families[smaller].append(y)
+                    LOG.debug(u"process_inflections: %s added to inflection family for %s", y, str(smaller))
+            
+    for i in inflection_families.keys():
+    	print "[%s] is a candidate inflection family via" % ", ".join(inflection_families[i]),
+    	for y in list(i):
+    		print y,
+    	print "\n"          
 
 def get_clusters(raw_file):
     """
