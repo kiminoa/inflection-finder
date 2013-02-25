@@ -5,6 +5,8 @@ import getopt
 import logging
 import unicodecsv
 import jsondoa
+import itertools
+from collections import defaultdict
 
 """
 An early step in any decipherment process: Is the language inflected?
@@ -51,19 +53,17 @@ def process_inflections():
     Phase II: Identify membership overlap between inflection candidates
     """
     # get the key-value pairs we stashed in JSON in process_clusters
-    inflections = {}
+    inflections = defaultdict(list) # allows append even with a new key
     candidates = JSON_DOA.retrieve()
     
-    for x in candidates:
-        LOG.debug(u"process_inflections: key from JSON: %s", x)
+    for k, v in candidates.iteritems():
+        LOG.debug(u"process_inflections: key from JSON: %s", k)
         # each line contains a key-value pair [ {'root': ['list', 'of', 'inflection', 'candidates'] } ]
-        for inflection in candidates[x]:
+        for inflection in v:
             # process through the value list and build our reverse key-value dictionary
             # each inflection candidate will act as a key and the roots as its list of values
             LOG.debug(u"process_inflections: inflection from JSON: %s", inflection)
-            if inflection not in inflections:
-                inflections[inflection] = [] # initiate list
-            inflections[inflection].append(x) # add root to candidate inflection
+            inflections[inflection].append(k) # add root to candidate inflection
 	
     print "\n\nInterim: Inflection Candidates"
     # remove candidates with only one instance, and report what remains
