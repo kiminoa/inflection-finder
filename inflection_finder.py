@@ -4,7 +4,7 @@ import sys
 import getopt
 import logging
 import unicodecsv
-import shelve
+import jsondoa
 
 """
 An early step in any decipherment process: Is the language inflected?
@@ -35,51 +35,49 @@ def add_candidate_to_file(root, inflections):
     root = root.encode('utf-8')
     candidate_entry = [ {root : inflections } ]
     LOG.debug(u"add_candidate_to_file: %s", candidate_entry)
-	
-    cfile = shelve.open(CANDIDATE_FILE)
-    cfile[root] = inflections
-    cfile.close()
-
-def process_inflections(inflections):
-    """
-    inputs a file with roots and inflection candidates, then determines which inflection candidates recur and are worth investigating
     
-    See also "Kober's Triplets", Alice Kober's early manual work on Linear B which used a similar methodology and was instrumental in the decipherment of Linear B.
+    candidate_entry = { root : inflections }
+    JSON_DOA.append(candidate_entry) # accumulate interim data to store in JSON file
+
+def process_inflections():
+    """
+    inputs a file with roots and inflection candidates, then determines which inflection 
+    candidates recur and are worth investigating
+    
+    See also "Kober's Triplets", Alice Kober's early manual work on Linear B which used a 
+    similar methodology and was instrumental in the decipherment of Linear B.
 
     Phase I: Identify inflection candidates based on frequency of occurrence
     Phase II: Identify membership overlap between inflection candidates
     """
-    # get the key-value pairs we stashed in shelve in process_clusters
+    # get the key-value pairs we stashed in JSON in process_clusters
     inflections = {}
-    candidates = {}
+    candidates = JSON_DOA.retrieve()
     
-    cfile = shelve.open(CANDIDATE_FILE)
-    
-    for x in cfile:
-        LOG.debug(u"process_inflections: key from shelve: %s", x)
+    for x in candidates:
+        LOG.debug(u"process_inflections: key from JSON: %s", x)
         # each line contains a key-value pair [ {'root': ['list', 'of', 'inflection', 'candidates'] } ]
-        for inflection in cfile[x]:
+        for inflection in candidates[x]:
             # process through the value list and build our reverse key-value dictionary
             # each inflection candidate will act as a key and the roots as its list of values
-            LOG.debug(u"process_inflections: inflection from shelve: %s", inflection)
+            LOG.debug(u"process_inflections: inflection from JSON: %s", inflection)
             if inflection not in inflections:
                 inflections[inflection] = [] # initiate list
             inflections[inflection].append(x) # add root to candidate inflection
-            
-    cfile.close()
 	
     print "\n\nInterim: Inflection Candidates"
     # remove candidates with only one instance, and report what remains
     for i in inflections.keys():
         # special case: one instance
         if len(inflections[i]) == 1:
-            # if the inflection occurs only once, we can assume it's noise and throw it out until added data in a future run corroborates it
-            LOG.debug("process_inflections: nixing %s with only 1 instance in %s.", i, inflections[i])
+            # if the inflection occurs only once, we can assume it's noise and throw it 
+            # out until added data in a future run corroborates it
+            LOG.debug(u"process_inflections: nixing %s with only 1 instance in %s.", i, inflections[i])
             del inflections[i]
             continue
-        print "\n%s is an inflection candidate with members: " % i,
+        print u"\n%s is an inflection candidate with members: " % i,
         for x in inflections[i]:
-            print str(x),
+            print u"%s" % x,
          
     print "\n\nInflection Family Candidates\n"   
     # group candidates into sensical inflection candidate families
@@ -168,7 +166,7 @@ def get_inflections(substring, cluster):
         if inflection == '':
             inflection = "self"
         LOG.debug("get_inflections: String %s after cutting %s: %s", i, substring, inflection)
-        inflections.append(u"%s" % inflection) # utf-8 friendly
+        inflections.append(inflection.encode('utf-8')) # utf-8 friendly
     return inflections
 
 def inflection_clusters(*args):
@@ -199,6 +197,8 @@ def process_clusters(cluster_file):
         inflection_clusters(cluster_list) # discover inflection candidates for each morpheme list
         del cluster_list[:] # reinitialize for next cluster
     cfile.close()
+    
+    JSON_DOA.store() # save interim data to JSON
 
 def usage():
     print "inflection_finder.py -f <csv-file> -l <loglevel:INFO|DEBUG|etc.>"
@@ -211,8 +211,9 @@ if __name__ == "__main__":
     # Defaults
     loglevel = "ERROR"
     clustered_file = "None"
-    global CANDIDATE_FILE
-    CANDIDATE_FILE = "candidate_inflections"
+    candidate_file = "candidate_inflections"
+    global JSON_DOA
+    JSON_DOA = jsondoa.JSONDOA(candidate_file) # JSON DOA for stashing interim data
     
     # Grab command line arguments
     opts, misc = getopt.getopt(sys.argv[1:], "hf:l:", ["help","file=","loglevel="])
@@ -244,4 +245,4 @@ if __name__ == "__main__":
     # Let's do it.
     print "\nFiles with candidate clustered morphemes should be CSV (utf-8 is Ok)."				
     process_clusters(clustered_file)
-    process_inflections(CANDIDATE_FILE)
+    process_inflections()
