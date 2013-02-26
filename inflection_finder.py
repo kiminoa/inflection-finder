@@ -129,7 +129,6 @@ def is_substring(substring, cluster):
     for data in cluster:
         LOG.debug("is_substring: Searching %s for substring %s...", data, substring)
         is_found = is_found and substring in data
-        LOG.debug("is_substring: is_found = %s\n", str(is_found))
     return is_found
 	
 def longest_substring(cluster):
@@ -140,9 +139,9 @@ def longest_substring(cluster):
     # use cluster[0] to find the longest substring in all cluster elements [1] - [n]
     # needs to be start- and end-agnostic as the longest substring could be anywhere
     # start at index 0 in this cluster and move through to len for outside loop
-    for x in range(len(cluster[0])):
+    for x in xrange(len(cluster[0])):
         # then create short to long substrings starting from the outer loop's index point
-        for y in range(x, len(cluster[0])-x+1):
+        for y in xrange(x, len(cluster[0])-x+1):
             candidate = cluster[0][x:y]
             LOG.debug("longest_substring: Trying %s...", candidate)
             if is_substring(candidate, cluster) and len(candidate) > len(substring):
