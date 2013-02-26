@@ -210,9 +210,6 @@ if __name__ == "__main__":
     # Defaults
     loglevel = "ERROR"
     clustered_file = "None"
-    candidate_file = "candidate_inflections"
-    global JSON_DOA
-    JSON_DOA = jsondoa.JSONDOA(candidate_file) # JSON DOA for stashing interim data
     
     # Grab command line arguments
     opts, misc = getopt.getopt(sys.argv[1:], "hf:l:", ["help","file=","loglevel="])
@@ -232,6 +229,11 @@ if __name__ == "__main__":
 
     if clustered_file == "None":
         sys.exit("File not specified.  Use -f or --file to specify; see inflection_finder.py -h.")
+    
+    # Dependent defaults    
+    candidate_file = clustered_file.split(".")[0] + "_candidate_inflections"
+    global JSON_DOA
+    JSON_DOA = jsondoa.JSONDOA(candidate_file) # JSON DOA for stashing interim data
             
     # Set up logging
     global LOG
