@@ -76,8 +76,7 @@ def process_inflections():
             del inflections[i]
             continue
         print u"\n%s is an inflection candidate with members: " % i,
-        for x in inflections[i]:
-            print u"%s" % x,
+        print u", ".join(inflections[i])
          
     print "\n\nInflection Family Candidates\n"   
     # group candidates into sensical inflection candidate families
@@ -113,9 +112,8 @@ def process_inflections():
         if family_members > 2:
             family_strength = "STRONG"
     	print u"[%s] is a %s candidate inflection family via" % (i, family_strength),
-    	for y in inflection_families[i]:
-    		print y,
-    	print u"[%d family member(s)]\n" % family_members          
+    	print ", ".join(inflection_families[i]),
+    	print u"[%d family member(s)]" % family_members          
 
 def get_clusters(raw_file):
     """
