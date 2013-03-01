@@ -81,36 +81,41 @@ def process_inflections():
          
     print "\n\nInflection Family Candidates\n"   
     # group candidates into sensical inflection candidate families
-    inflection_families = {}
+    inflection_families = defaultdict(list)
     
     for x in inflections.keys():
+        setx = frozenset(inflections[x])
         # Find all other inflection candidates for which this one's members is a subset
         for y in inflections.keys():
+            # avoid comparing to self
             if x == y: continue
-            if len(inflections[x]) < len (inflections[y]):
-        	    smaller = inflections[x]
-        	    larger = inflections[y]
-            else:
-                smaller = inflections[y]
-                larger = inflections[x]
             
-            if is_subset(smaller, larger):
-                LOG.debug(u"process_inflections: candidate family found via %s", str(smaller))
-                smaller = frozenset(smaller)
-                if smaller not in inflection_families:
-                    inflection_families[smaller] = []
-                if x not in inflection_families[smaller]:
-                    inflection_families[smaller].append(x)
-                    LOG.debug(u"process_inflections: %s added to inflection family for %s", x, str(smaller))
-                if y not in inflection_families[smaller]:
-                    inflection_families[smaller].append(y)
-                    LOG.debug(u"process_inflections: %s added to inflection family for %s", y, str(smaller))
+            # avoid processing duplicates like [-ed, -ing] and [-ing, -ed]
+            inverse_key = u"%s, %s" % (y, x)
+            if inverse_key in inflection_families: continue
+            
+            sety = frozenset(inflections[y])            
+            setxy = setx & sety # find intersection
+            if len(setxy) == 0: continue # no intersection
+            
+            inflection_family_key = u"%s, %s" % (x, y)
+            for i in list(setxy):
+                # avoid duplicates
+                if i not in inflection_families[inflection_family_key]:
+                    inflection_families[inflection_family_key].append(i)           
             
     for i in inflection_families.keys():
-    	print "[%s] is a candidate inflection family via" % ", ".join(inflection_families[i]),
-    	for y in list(i):
+        family_members = len(inflection_families[i])
+        if family_members == 1:
+            del inflection_families[i] # nix families with only 1 member
+            continue
+        family_strength = "WEAK"
+        if family_members > 2:
+            family_strength = "STRONG"
+    	print u"[%s] is a %s candidate inflection family via" % (i, family_strength),
+    	for y in inflection_families[i]:
     		print y,
-    	print "\n"          
+    	print u"[%d family member(s)]\n" % family_members          
 
 def get_clusters(raw_file):
     """
@@ -149,12 +154,26 @@ def longest_substring(cluster):
                 LOG.debug("longest_substring: A substring match has been found: %s", substring)
     logging.info("Longest substring is %s.", substring)
     return substring
+    
+def strip_delimiter(delimited):
+    """
+    inputs a string, and strips leading and trailing delimiters
+    """
+    substr_len = len(delimited)
+    
+    # if there is a leading or trailing delimiter, strip it for matching purposes, but
+    # keep all other delimiters in tact
+    if delimited[substr_len - 1] == DELIMITER:
+        delimited = delimited.rstrip(DELIMITER)
+    if delimited[0] == DELIMITER:
+        delimited = delimited.lstrip(DELIMITER)
+        
+    return delimited
 	
 def get_inflections(substring, cluster):
     """
     inputs the longest common substring for a cluster and returns the list of what *isn't* common in the cluster
     """
-    # Need a fix for Russian Cyrillic; this is where it starts having issues (plus double-byte issues in longest_substring)
     sublen = len(substring)
     inflections = []
     for i in cluster:
@@ -163,7 +182,7 @@ def get_inflections(substring, cluster):
         inflection = i.replace(i[startdel:startdel+sublen], '')
         # Special case: if one of the elements in the cluster *is* the longest common substring
         if inflection == '':
-            inflection = "self"
+            inflection = substring + "-root"
         LOG.debug("get_inflections: String %s after cutting %s: %s", i, substring, inflection)
         inflections.append(inflection.encode('utf-8')) # utf-8 friendly
     return inflections
@@ -176,6 +195,10 @@ def inflection_clusters(*args):
     How do we handle edge cases where the common ground is a complete set, i.e. (ko-no-so, ko-no-so-de)? should have a way to return root + -de instead of just -de
     """
     common_substring = longest_substring(*args)
+    # strip leading or trailing delimiter for matching purposes
+    if len(DELIMITER) > 0:
+        common_substring = strip_delimiter(common_substring)
+    
     inflection_candidates = get_inflections(common_substring, *args)
 	
     LOG.debug("Inflection candidates:\n%s", inflection_candidates)
@@ -210,9 +233,11 @@ if __name__ == "__main__":
     # Defaults
     loglevel = "ERROR"
     clustered_file = "None"
+    global DELIMITER
+    DELIMITER = ""
     
     # Grab command line arguments
-    opts, misc = getopt.getopt(sys.argv[1:], "hf:l:", ["help","file=","loglevel="])
+    opts, misc = getopt.getopt(sys.argv[1:], "hf:l:d:", ["help","file=","loglevel=","delimiter="])
        
     for opt, arg in opts:
         if opt in ("-h", "--help"):
@@ -222,6 +247,8 @@ if __name__ == "__main__":
             clustered_file = arg
         elif opt in ("-l", "--loglevel"):
             loglevel = arg
+        elif opt in ("-d", "--delimiter"):
+            DELIMITER = arg
         else:
             print "Unrecognized option."
             usage()
