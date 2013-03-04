@@ -16,19 +16,18 @@ Won't catch irregular inflections like tener 'to have' inflected as tiene '(s)he
 
 # Phase I - kiminoa@gmail.com
 
-def is_subset(member, member_of):
+def find_intersection(lista, listb):
     """
     Checks if list (member) is a subset of list (member_of)
     """
-    LOG.debug(u"is_subset: is %s a subset of %s?", member, member_of)
-    setm = frozenset(member)
-    setmo = frozenset(member_of)
-    compare_sets = setm & setmo
-    if compare_sets == setm:
-        LOG.debug(u"is_subset: %s is a subset of %s", member, member_of)
-        return True
-    else:
+    LOG.debug(u"find_intersection of %s and %s", str(lista), str(listb))
+    seta = frozenset(lista)
+    setb = frozenset(listb)
+    intersect_ab = seta & setb
+    if len(intersect_ab) == 0:
         return False
+    else:
+        return intersect_ab
 
 def add_candidate_to_file(root, inflections):
     """
@@ -83,7 +82,6 @@ def process_inflections():
     inflection_families = defaultdict(list)
     
     for x in inflections.keys():
-        setx = frozenset(inflections[x])
         # Find all other inflection candidates for which this one's members is a subset
         for y in inflections.keys():
             # avoid comparing to self
@@ -93,12 +91,11 @@ def process_inflections():
             inverse_key = u"%s, %s" % (y, x)
             if inverse_key in inflection_families: continue
             
-            sety = frozenset(inflections[y])            
-            setxy = setx & sety # find intersection
-            if len(setxy) == 0: continue # no intersection
+            intersect_xy = find_intersection(inflections[x], inflections[y])
+            if intersect_xy == False: continue
             
             inflection_family_key = u"%s, %s" % (x, y)
-            for i in list(setxy):
+            for i in list(intersect_xy):
                 # avoid duplicates
                 if i not in inflection_families[inflection_family_key]:
                     inflection_families[inflection_family_key].append(i)           
@@ -221,8 +218,12 @@ def process_clusters(cluster_file):
     JSON_DOA.store() # save interim data to JSON
 
 def usage():
-    print "inflection_finder.py -f <csv-file> -l <loglevel:INFO|DEBUG|etc.>"
-    print "inflection_finder.py --file=<csv_file> --loglevel=DEBUG|INFO|WARNING|ERROR|CRITICAL"
+    print """inflection_finder.py -f <csv-file> -l <loglevel:INFO|DEBUG|etc.> -d (delimiter)
+\ninflection_finder.py --file=<csv_file> --delimiter=(delimiter)
+--loglevel=DEBUG|INFO|WARNING|ERROR|CRITICAL
+\nFile is required.  Delimiter and loglevel are optional."
+\nDelimiter is used for non-alphabetic representations, like the hypen 
+separating syllables in alphasyllabaries."""
 
 if __name__ == "__main__":
     """
