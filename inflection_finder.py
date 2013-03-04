@@ -18,7 +18,9 @@ Won't catch irregular inflections like tener 'to have' inflected as tiene '(s)he
 
 def find_intersection(lista, listb):
     """
-    Checks if list (member) is a subset of list (member_of)
+    Checks if list (a) has any interesction with list (b)
+    Returns intersection if true (frozenset)
+    Returns False otherwise
     """
     LOG.debug(u"find_intersection of %s and %s", str(lista), str(listb))
     seta = frozenset(lista)
@@ -28,6 +30,45 @@ def find_intersection(lista, listb):
         return False
     else:
         return intersect_ab
+        
+def composite_key(keya, keyb):
+    """
+    Returns a new, sorted key list which is a non-duplicated composite of keys passed in
+    Example: If the keys are "-we, -u" and "-we, -wo", will return "-we, -u, -wo"
+    """
+    keyab = ", ".join(keya.split(", ")+keyb.split(", ")) # append strings
+    keyc = u"%s" % ", ".join(sorted(set(keyab.split(", ")))) # recreate desire string formatting
+    return keyc
+    
+def create_inflection_families(candidates):
+    """
+    Takes a dictionary of inflections (key) associated with roots (value) and finds 
+    inflection families, returning a new dictionary
+    Example: { '-u':'e-re-e', '-we':'e-re-e', '-wo':'e-re-e' } will return (after 2
+    iterations) { '-u, -we, -wo':'e-re-e' } where (-u, -we, -wo) is now an inflection
+    family candidate.
+    """
+    inflection_family_candidates = defaultdict(list)
+    
+    for x in candidates.keys():
+    # Find all other inflection candidates for which this one's members is a subset
+        for y in candidates.keys():
+            # avoid comparing to self
+            if x == y: continue
+            
+            # avoid processing duplicates like [-ed, -ing] and [-ing, -ed]
+            if x in inflection_family_candidates: continue
+            
+            intersect_xy = find_intersection(candidates[x], candidates[y])
+            if intersect_xy == False: continue
+            
+            inflection_family_key = composite_key(x, y)
+            for i in list(intersect_xy):
+                # avoid duplicates
+                if i not in inflection_family_candidates[inflection_family_key]:
+                    inflection_family_candidates[inflection_family_key].append(i)
+    
+    return inflection_family_candidates
 
 def add_candidate_to_file(root, inflections):
     """
@@ -51,7 +92,7 @@ def process_inflections():
     Phase I: Identify inflection candidates based on frequency of occurrence
     Phase II: Identify membership overlap between inflection candidates
     """
-    # get the key-value pairs we stashed in JSON in process_clusters
+    # get the key-value pairs we stashed in JSON during process_clusters
     inflections = defaultdict(list) # allows append even with a new key
     candidates = JSON_DOA.retrieve()
     
@@ -76,40 +117,29 @@ def process_inflections():
             continue
         print u"\n%s is an inflection candidate with members: " % i,
         print u", ".join(inflections[i])
-         
+        
+    inflection_families = defaultdict(list)     
     print "\n\nInflection Family Candidates\n"   
     # group candidates into sensical inflection candidate families
-    inflection_families = defaultdict(list)
-    
-    for x in inflections.keys():
-        # Find all other inflection candidates for which this one's members is a subset
-        for y in inflections.keys():
-            # avoid comparing to self
-            if x == y: continue
-            
-            # avoid processing duplicates like [-ed, -ing] and [-ing, -ed]
-            inverse_key = u"%s, %s" % (y, x)
-            if inverse_key in inflection_families: continue
-            
-            intersect_xy = find_intersection(inflections[x], inflections[y])
-            if intersect_xy == False: continue
-            
-            inflection_family_key = u"%s, %s" % (x, y)
-            for i in list(intersect_xy):
-                # avoid duplicates
-                if i not in inflection_families[inflection_family_key]:
-                    inflection_families[inflection_family_key].append(i)           
-            
-    for i in inflection_families.keys():
-        family_members = len(inflection_families[i])
+    inflection_families = create_inflection_families(inflections)
+    # do it one more time to get a better intersection of families XXX is there a better
+    # way to handle this double-call? XXX
+    inflection_families_r2 = create_inflection_families(inflection_families)
+    # combine both sets of results
+    all_candidates = dict(inflection_families.items() + inflection_families_r2.items())
+                    
+    # Sort by most inflection endings in a single family first            
+    for i in sorted(all_candidates.items(), key=lambda inflection: len(inflection[0].split(", ")), reverse=True):
+        # key = i[0], value = i[1]
+        family_members = len(i[1])
         if family_members == 1:
-            del inflection_families[i] # nix families with only 1 member
+            del all_candidates[i[0]] # nix families with only 1 member
             continue
         family_strength = "WEAK"
         if family_members > 2:
             family_strength = "STRONG"
-    	print u"[%s] is a %s candidate inflection family via" % (i, family_strength),
-    	print ", ".join(inflection_families[i]),
+    	print u"[%s] is a %s candidate inflection family via" % (i[0], family_strength),
+    	print ", ".join(i[1]),
     	print u"[%d family member(s)]" % family_members          
 
 def get_clusters(raw_file):
