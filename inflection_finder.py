@@ -5,7 +5,6 @@ import getopt
 import logging
 import unicodecsv
 import jsondoa
-import itertools
 from collections import defaultdict
 
 """
@@ -27,7 +26,7 @@ def find_intersection(lista, listb):
     setb = frozenset(listb)
     intersect_ab = seta & setb
     if len(intersect_ab) == 0:
-        return False
+        return None
     else:
         return intersect_ab
         
@@ -60,7 +59,7 @@ def create_inflection_families(candidates):
             if x in inflection_family_candidates: continue
             
             intersect_xy = find_intersection(candidates[x], candidates[y])
-            if intersect_xy == False: continue
+            if intersect_xy == None: continue
             
             inflection_family_key = composite_key(x, y)
             for i in list(intersect_xy):
