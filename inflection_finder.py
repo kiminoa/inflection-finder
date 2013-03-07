@@ -146,7 +146,7 @@ def get_clusters(raw_file):
     [unimplemented] inputs a file of unique morphemes, outputs clusters of potential inflections
     
     Phase I: let OpenRefine do the heavy lifting and create the file of clusters (process_clusters) from raw data
-    Phase II: use Python libraries to do the clustering (get_clusters)
+    Phase II: use Python libraries to do the clustering (get_clusters) - move this to its own file for Phase II
     """
     pass
 	
@@ -169,10 +169,13 @@ def longest_substring(cluster):
     # needs to be start- and end-agnostic as the longest substring could be anywhere
     # start at index 0 in this cluster and move through to len for outside loop
     for x in xrange(len(cluster[0])):
-        # then create short to long substrings starting from the outer loop's index point
-        for y in xrange(x, len(cluster[0])-x+1):
+        # then create long to short substrings starting from the outer loop's index point
+        for y in reversed(list(xrange(x, len(cluster[0])-x+1))):
             candidate = cluster[0][x:y]
-            LOG.debug("longest_substring: Trying %s...", candidate)
+            if len(candidate) < len(substring):
+                LOG.debug("longest_substring: Skipping %s [%s:%s], shorter than %s", candidate, x, y, substring)
+                break # don't process substrings shorter than our best candidate
+            LOG.debug("longest_substring: Trying %s [%s:%s]...", candidate, x, y)
             if is_substring(candidate, cluster) and len(candidate) > len(substring):
                 substring = candidate
                 LOG.debug("longest_substring: A substring match has been found: %s", substring)
@@ -219,16 +222,20 @@ def inflection_clusters(*args):
     How do we handle edge cases where the common ground is a complete set, i.e. (ko-no-so, ko-no-so-de)? should have a way to return root + -de instead of just -de
     """
     common_substring = longest_substring(*args)
-    # strip leading or trailing delimiter for matching purposes
-    if len(DELIMITER) > 0:
-        common_substring = strip_delimiter(common_substring)
     
-    inflection_candidates = get_inflections(common_substring, *args)
+    if len(common_substring) > 0:
+        # only continue to process if a common substring was found for the cluster
+    
+        # strip leading or trailing delimiter for matching purposes
+        if len(DELIMITER) > 0:
+            common_substring = strip_delimiter(common_substring)
+    
+        inflection_candidates = get_inflections(common_substring, *args)
 	
-    LOG.debug("Inflection candidates:\n%s", inflection_candidates)
+        LOG.debug("Inflection candidates:\n%s", inflection_candidates)
 	
-    # Add common string as element 1 of list (treat as key) + inflections as element 2 of list
-    add_candidate_to_file(common_substring, inflection_candidates)
+        # Add common string as element 1 of list (treat as key) + inflections as element 2 of list
+        add_candidate_to_file(common_substring, inflection_candidates)
 
 def process_clusters(cluster_file):
     """
@@ -240,7 +247,8 @@ def process_clusters(cluster_file):
         for i in line:
             LOG.debug(u"process_clusters: From CSV: %s", i)
             cluster_list.append(i.strip())
-        inflection_clusters(cluster_list) # discover inflection candidates for each morpheme list
+        if cluster_list: 
+            inflection_clusters(cluster_list) # discover inflection candidates for each morpheme list
         del cluster_list[:] # reinitialize for next cluster
     cfile.close()
     
