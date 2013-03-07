@@ -160,6 +160,31 @@ def is_substring(substring, cluster):
         is_found = is_found and substring in data
     return is_found
 	
+def longest_substring_syllabary(cluster):
+    """
+    inputs a list of potential inflections, returns longest syllabary-respecting substring
+    """
+    substring = ''
+    # use cluster[0] to find the longest substring in all cluster elements [1] - [n]
+    # needs to be start- and end-agnostic as the longest substring could be anywhere
+    # needs to be syllabary-aware and respect DELIMITER
+    # start at index 0 in this cluster and move through each syllable to the last syllable
+    syllables = cluster[0].count(DELIMITER) + 1
+    LOG.debug(u"longest_substring_syllabary: Processing %d syllables", syllables)
+    for x in xrange(syllables):
+        candidate_list = cluster[0].split(DELIMITER, syllables - x)
+        for y in xrange(syllables):
+            candidate = DELIMITER.join(candidate_list[x:syllables - y])
+            if len(candidate) < len(substring):
+                LOG.debug(u"longest_substring_syllabary: Skipping %s, shorter than %s", candidate, substring)
+                break # don't process substrings shorter than our best candidate
+            LOG.debug(u"longest_substring_syllabary: Trying %s", candidate)
+            if is_substring(candidate, cluster) and len(candidate) > len(substring):
+                substring = candidate
+                LOG.debug(u"longest_substring_syllabary: A substring match has been found: %s", substring)
+    logging.info(u"Longest substring is %s.", substring)
+    return substring	
+	
 def longest_substring(cluster):
     """
     inputs a list of potential inflections, returns the longest common substring shared by all
@@ -173,13 +198,13 @@ def longest_substring(cluster):
         for y in reversed(list(xrange(x, len(cluster[0])-x+1))):
             candidate = cluster[0][x:y]
             if len(candidate) < len(substring):
-                LOG.debug("longest_substring: Skipping %s [%s:%s], shorter than %s", candidate, x, y, substring)
+                LOG.debug(u"longest_substring: Skipping %s [%s:%s], shorter than %s", candidate, x, y, substring)
                 break # don't process substrings shorter than our best candidate
-            LOG.debug("longest_substring: Trying %s [%s:%s]...", candidate, x, y)
+            LOG.debug(u"longest_substring: Trying %s [%s:%s]...", candidate, x, y)
             if is_substring(candidate, cluster) and len(candidate) > len(substring):
                 substring = candidate
-                LOG.debug("longest_substring: A substring match has been found: %s", substring)
-    logging.info("Longest substring is %s.", substring)
+                LOG.debug(u"longest_substring: A substring match has been found: %s", substring)
+    logging.info(u"Longest substring is %s.", substring)
     return substring
     
 def strip_delimiter(delimited):
@@ -221,13 +246,16 @@ def inflection_clusters(*args):
     For example, if we receive the list (ko-no-so, ko-no-si-jo, ko-no-si-ja, ko-no-so-de), we will receive in response (o, i-jo, i-ja, o-de) as ko-no-s is ubiquitous. 
     How do we handle edge cases where the common ground is a complete set, i.e. (ko-no-so, ko-no-so-de)? should have a way to return root + -de instead of just -de
     """
-    common_substring = longest_substring(*args)
+    if SYLLABARY:
+        common_substring = longest_substring_syllabary(*args)
+    else:
+        common_substring = longest_substring(*args)
     
     if len(common_substring) > 0:
         # only continue to process if a common substring was found for the cluster
     
         # strip leading or trailing delimiter for matching purposes
-        if len(DELIMITER) > 0:
+        if DELIMITER:
             common_substring = strip_delimiter(common_substring)
     
         inflection_candidates = get_inflections(common_substring, *args)
@@ -255,10 +283,14 @@ def process_clusters(cluster_file):
     JSON_DOA.store() # save interim data to JSON
 
 def usage():
-    print """inflection_finder.py -f <csv-file> -l <loglevel:INFO|DEBUG|etc.> -d (delimiter)
-\ninflection_finder.py --file=<csv_file> --delimiter=(delimiter)
---loglevel=DEBUG|INFO|WARNING|ERROR|CRITICAL
-\nFile is required.  Delimiter and loglevel are optional."
+    print """inflection_finder.py
+\nRequired parameters:
+-f, --file= <csv-file> 
+\nOptional parameters:
+-h, --help\t\t\tprints this help message
+-l, --loglevel= <loglevel:INFO|DEBUG|WARNING|ERROR|CRITICAL> 
+-s, --syllabary\t\t\tflags input language as a syllabary
+-d, --delimiter= <delimiter>\tsyllabary delimiter
 \nDelimiter is used for non-alphabetic representations, like the hypen 
 separating syllables in alphasyllabaries."""
 
@@ -270,10 +302,12 @@ if __name__ == "__main__":
     loglevel = "ERROR"
     clustered_file = "None"
     global DELIMITER
-    DELIMITER = ""
+    DELIMITER = None
+    global SYLLABARY
+    SYLLABARY = False
     
     # Grab command line arguments
-    opts, misc = getopt.getopt(sys.argv[1:], "hf:l:d:", ["help","file=","loglevel=","delimiter="])
+    opts, misc = getopt.getopt(sys.argv[1:], "hsf:l:d:", ["help","syllabary","file=","loglevel=","delimiter="])
        
     for opt, arg in opts:
         if opt in ("-h", "--help"):
@@ -285,6 +319,8 @@ if __name__ == "__main__":
             loglevel = arg
         elif opt in ("-d", "--delimiter"):
             DELIMITER = arg
+        elif opt in ("=s", "--syllabary"):
+            SYLLABARY = True
         else:
             print "Unrecognized option."
             usage()
