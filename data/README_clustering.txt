@@ -21,4 +21,4 @@ Key Collision
 Python Module Clustering Algorithms
 
     import cluster; HierarchicalClustering
-    --> lambda x,y: len(str(x) & str(y)) - algorithm is probably naïve and not doing the trick.
+    --> lambda x,y: len(str(x) & str(y)) - algorithm is probably naïve? Definitely not doing the trick.
