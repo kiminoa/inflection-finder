@@ -6,7 +6,9 @@ Nearest Neighbor
     --> r=1,2 b=6 ok results, slightly better for radius=2.0
 
 (*) PPM
-    --> r=1 b=5 best results among Open Refine's clustering algorithms
+    --> r=1 b=5 best results among Open Refine's clustering algorithms for the 20 line sample
+    --> r=1 b=4 better results for a clustering of the complete lexicon
+	- correctly identified 
 
 Key Collision
 
@@ -15,3 +17,8 @@ Key Collision
 
     double-metaphone
     --> clusters are way too broad
+
+Python Module Clustering Algorithms
+
+    import cluster; HierarchicalClustering
+    --> lambda x,y: len(str(x) & str(y)) - algorithm is probably naïve and not doing the trick.
