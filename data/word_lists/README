@@ -1,0 +1,13 @@
+word_lists: Unprocessed word lists, one "word" per line
+
+Linear A
+--------
+Created from Younger's phonetic transcriptions May-June 2013:
+   http://www.people.ku.edu/~jyounger/LinearA/HTtexts.html
+
+"With Partials" - includes sign groups like ]-RI-SU-MA
+"Word-List" - excludes partials
+
+Linear B
+--------
+Excludes partials.
