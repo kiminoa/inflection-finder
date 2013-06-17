@@ -1,4 +1,4 @@
-Open Refine Clustering Algorithms
+====Open Refine Clustering Algorithms====
 
 Nearest Neighbor
 
@@ -18,7 +18,11 @@ Key Collision
     double-metaphone
     --> clusters are way too broad
 
-Python Module Clustering Algorithms
+====Python Module Clustering Algorithms===
 
     import cluster; HierarchicalClustering
     --> lambda x,y: len(str(x) & str(y)) - algorithm is probably naïve? Definitely not doing the trick.
+
+    import ntlk
+
+        GAAC (group average allomerative clusterer)
