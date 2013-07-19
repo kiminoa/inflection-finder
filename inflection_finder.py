@@ -1,19 +1,21 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-import sys
-import getopt
-import logging
-import unicodecsv
-import jsondoa
+import getopt, logging, sys
+import jsondoa, unicodecsv
+import itertools
 from collections import defaultdict
 
 """
 An early step in any decipherment process: Is the language inflected?
+
 "walked" and "walking" are inflections of "walk", as is "dogs" of "dog".
-Won't catch irregular inflections like tener 'to have' inflected as tiene '(s)he has' and tengo 'i have' in Spanish, but is an organized step in approaching an undeciphered writing system
+
+This won't catch irregular inflections like tener 'to have' inflected as tiene '(s)he has' and 
+tengo 'i have' in Spanish, but this is an organized step in approaching an undeciphered 
+writing system.
 """
 
-# Phase I - kiminoa@gmail.com
+# Phase I - kiminoa@gmail.com / K.A. Raymoure
 
 def find_intersection(lista, listb):
     """
@@ -57,9 +59,10 @@ def create_inflection_families(candidates):
             
             # avoid processing duplicates like [-ed, -ing] and [-ing, -ed]
             if x in inflection_family_candidates: continue
-            
+           
+            # no intersection found 
             intersect_xy = find_intersection(candidates[x], candidates[y])
-            if intersect_xy == None: continue
+            if not intersect_xy: continue
             
             inflection_family_key = composite_key(x, y)
             for i in list(intersect_xy):
@@ -71,7 +74,8 @@ def create_inflection_families(candidates):
 
 def add_candidate_to_file(root, inflections):
     """
-    outputs to an interim file: each line is a key-value pair [ { 'root' : ['inflection', 'candidates'] } ]
+    outputs to an interim file: each line is a key-value pair [ { 'root' : ['inflection', 
+    'candidates'] } ]
     """
     root = root.encode('utf-8')
     candidate_entry = [ {root : inflections } ]
@@ -143,10 +147,14 @@ def process_inflections():
 
 def get_clusters(raw_file):
     """
-    [unimplemented] inputs a file of unique morphemes, outputs clusters of potential inflections
+    [unimplemented] inputs a file of unique morphemes, outputs clusters of potential 
+    inflections
     
-    Phase I: let OpenRefine do the heavy lifting and create the file of clusters (process_clusters) from raw data
-    Phase II: use Python libraries to do the clustering (get_clusters) - move this to its own file for Phase II
+    Phase I: let OpenRefine do the heavy lifting and create the file of clusters 
+    (process_clusters) from raw data
+    
+    Phase II: use Python libraries to do the clustering (get_clusters) - move this to its 
+    own file for Phase II
     """
     pass
 	
@@ -187,7 +195,8 @@ def longest_substring_syllabary(cluster):
 	
 def longest_substring(cluster):
     """
-    inputs a list of potential inflections, returns the longest common substring shared by all
+    inputs a list of potential inflections, returns the longest common substring shared 
+    by all
     """
     substring = ''
     # use cluster[0] to find the longest substring in all cluster elements [1] - [n]
@@ -224,7 +233,8 @@ def strip_delimiter(delimited):
 	
 def get_inflections(substring, cluster):
     """
-    inputs the longest common substring for a cluster and returns the list of what *isn't* common in the cluster
+    inputs the longest common substring for a cluster and returns the list of what *isn't*
+    common in the cluster
     """
     sublen = len(substring)
     inflections = []
@@ -234,7 +244,7 @@ def get_inflections(substring, cluster):
         inflection = i.replace(i[startdel:startdel+sublen], '')
         # Special case: if one of the elements in the cluster *is* the longest common substring
         if inflection == '':
-            inflection = substring + "-root"
+            inflection = "root"
         LOG.debug("get_inflections: String %s after cutting %s: %s", i, substring, inflection)
         inflections.append(inflection.encode('utf-8')) # utf-8 friendly
     return inflections
@@ -243,8 +253,10 @@ def inflection_clusters(*args):
     """
     inputs a list of potential inflections, outputs a list of potential cases
     
-    For example, if we receive the list (ko-no-so, ko-no-si-jo, ko-no-si-ja, ko-no-so-de), we will receive in response (o, i-jo, i-ja, o-de) as ko-no-s is ubiquitous. 
-    How do we handle edge cases where the common ground is a complete set, i.e. (ko-no-so, ko-no-so-de)? should have a way to return root + -de instead of just -de
+    For example, if we receive the list (ko-no-so, ko-no-si-jo, ko-no-si-ja, ko-no-so-de),
+    we will receive in response (o, i-jo, i-ja, o-de) as ko-no-s is ubiquitous. 
+    How do we handle edge cases where the common ground is a complete set, i.e. (ko-no-so,
+    ko-no-so-de)? should have a way to return root + -de instead of just -de
     """
     if SYLLABARY:
         common_substring = longest_substring_syllabary(*args)
@@ -267,17 +279,25 @@ def inflection_clusters(*args):
 
 def process_clusters(cluster_file):
     """
-    inputs a file with a list of potential inflections in a cluster on each line, processes one line at a time
+    inputs a file with a list of potential inflections in a cluster on each line, 
+    processes one line at a time
+    parses 3+ cluster groups into pairs for additional processing
     """
     cfile = open(cluster_file)
-    cluster_list = []
+
     for line in unicodecsv.reader(cfile, encoding="utf-8"):
-        for i in line:
-            LOG.debug(u"process_clusters: From CSV: %s", i)
-            cluster_list.append(i.strip())
-        if cluster_list: 
-            inflection_clusters(cluster_list) # discover inflection candidates for each morpheme list
-        del cluster_list[:] # reinitialize for next cluster
+        LOG.debug(u"process_clusters: From CSV: %s", repr(line))
+
+        # Adds a complete cluster, like "a-sa-ra2,sa-ra2,sa-ra-ra"
+        inflection_clusters(line) # discover inflection candidates for each morpheme list
+
+        # Adds sub-cluster sign group pairs for completeness, like "a-sa-ra2,sa-ra2"
+        sub_cluster_combos = itertools.combinations(line, 2)
+
+        for combo in sub_cluster_combos: 
+            inflection_clusters(combo)
+            LOG.debug(u"Adding cluster pair %s" % repr(combo))
+
     cfile.close()
     
     JSON_DOA.store() # save interim data to JSON
@@ -291,8 +311,11 @@ def usage():
 -l, --loglevel= <loglevel:INFO|DEBUG|WARNING|ERROR|CRITICAL> 
 -s, --syllabary\t\t\tflags input language as a syllabary
 -d, --delimiter= <delimiter>\tsyllabary delimiter
-\nDelimiter is used for non-alphabetic representations, like the hypen 
-separating syllables in alphasyllabaries."""
+\nDelimiter is used for non-alphabetic representations, like the hyphen 
+separating syllables in alphasyllabaries.
+\nExamples:
+inflection_finder.py -s -d \"-\" -f alphasyllabary.csv
+inflection_finder.py -f alphabet.csv"""
 
 if __name__ == "__main__":
     """
@@ -319,7 +342,7 @@ if __name__ == "__main__":
             loglevel = arg
         elif opt in ("-d", "--delimiter"):
             DELIMITER = arg
-        elif opt in ("=s", "--syllabary"):
+        elif opt in ("-s", "--syllabary"):
             SYLLABARY = True
         else:
             print "Unrecognized option."
